@@ -1,22 +1,25 @@
 // 필요한 라이브러리들을 불러옵니다.
 const express = require('express');
 const request = require('request');
-const cors = require('cors'); // 다른 웹사이트에서의 요청을 허용해주는 라이브러리
+const cors = require('cors');
 
 const app = express();
-
-// CORS 설정: 모든 곳에서의 요청을 허용합니다. (개발용)
 app.use(cors()); 
 
-// 네이버 개발자 센터에서 발급받은 키를 여기에 입력합니다.
 const clientId = 'rpCe23Hq0Uqu9PdQzKhf';
 const clientSecret = 'cWzcufKgEe';
 
+// --- 여기부터 3줄을 추가해주세요 ---
+// 헬스 체크를 위한 루트 경로
+app.get('/', (req, res) => {
+    res.send('Server is healthy!');
+});
+// --- 여기까지 추가 ---
+
 // '/search/news' 라는 주소로 요청이 오면, 네이버에 뉴스를 검색하여 결과를 전달합니다.
 app.get('/search/news', (req, res) => {
-    // 클라이언트에서 'query' 파라미터로 검색어를 받거나, 없으면 '정치'를 기본값으로 사용합니다.
     const query = req.query.query || '정치'; 
-    const api_url = 'https://openapi.naver.com/v1/search/news.json?query=' + encodeURI(query) + '&display=20&sort=sim'; // 20개, 유사도순 정렬
+    const api_url = 'https://openapi.naver.com/v1/search/news.json?query=' + encodeURI(query) + '&display=20&sort=sim';
 
     const options = {
         url: api_url,
@@ -34,6 +37,5 @@ app.get('/search/news', (req, res) => {
     });
 });
 
-// 3000번 포트에서 서버를 실행합니다. Render에서는 자동으로 포트를 설정해줍니다.
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
