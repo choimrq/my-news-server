@@ -49,7 +49,7 @@ app.get('/scrape', async (req, res) => {
         const $ = cheerio.load(data);
 
         // 1. 불필요한 요소(스크립트, 스타일, 광고 등)를 먼저 제거
-        $('script, style, .ad, .advertisement, #advertisement, .ad-box, .aside_section').remove();
+        $('script, style, .ad, .advertisement, #advertisement, .ad-box, .aside_section, #comment, .footer').remove();
 
         // 2. 기사 본문이 들어있는 영역을 선택 (언론사마다 다를 수 있음)
         let articleText = 
