@@ -48,27 +48,35 @@ app.get('/scrape', async (req, res) => {
         const { data } = await axios.get(url);
         const $ = cheerio.load(data);
 
-        // 1. 불필요한 요소(스크립트, 스타일, 광고 등)를 먼저 제거
-        $('script, style, .ad, .advertisement, #advertisement, .ad-box, .aside_section, #comment, .footer').remove();
+        // 1. 불필요한 요소(스크립트, 스타일, 광고, 헤더, 푸터 등)를 먼저 강력하게 제거
+        $('script, style, .ad, .advertisement, #advertisement, .ad-box, #aside_section, .aside_section, header, footer, .header, .footer, #header, #footer, .top-nav, .bottom-nav, .related-news, .news-related, #comment, .comment-area').remove();
 
-        // 2. 기사 본문이 들어있는 영역을 선택 (언론사마다 다를 수 있음)
-        let articleText = 
-            $('div#article-body-contents').text() || 
-            $('div#dic_area').text() ||
-            $('div.article_body').text() ||
-            $('div.article-veiw-body').text() ||
-            $('article').text();
+        // 2. 기사 본문이 들어있는 가장 유력한 영역을 선택
+        let articleBody = 
+            $('div#article-body-contents, div#dic_area, div.article_body, div.article-veiw-body, article, section#articleBody');
 
-        // 3. 불필요한 공백과 줄바꿈, 광고성 문구를 정규식으로 정리
+        // 3. 본문 영역 내에서도 불필요한 자식 요소를 추가로 제거
+        articleBody.find('.reporter, .byline, .copyright, .article-info, .function_btns').remove();
+
+        let articleText = articleBody.text();
+
+        // 4. 불필요한 공백과 줄바꿈, 광고성 문구를 정규식으로 정리
         articleText = articleText
             .replace(/(\s{2,})/g, ' ') // 연속된 공백을 하나로
             .replace(/(\n\s*){3,}/g, '\n\n') // 3번 이상의 연속 줄바꿈을 두 번으로
+            .replace(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/g, '') // 이메일 주소 제거
+            .replace(/\[.*?\]/g, '') // [ ] 괄호와 내용 제거 (예: [서울=뉴시스])
+            .replace(/【.*?】/g, '') // 【 】 괄호와 내용 제거
+            .replace(/\(.*?=.*?\)/g, '') // (서울=연합뉴스) 같은 형식 제거
+            .replace(/기자\s*=/g, '')
+            .replace(/Copyrights.*All rights reserved/g, '') // 저작권 문구 제거
+            .replace(/무단 전재 및 재배포 금지/g, '') // 재배포 금지 문구 제거
             .replace(/ADVERTISEMENT/g, '') // 'ADVERTISEMENT' 단어 제거
             .replace(/많이 본 뉴스/g, '') // '많이 본 뉴스' 문구 제거
             .replace(/이 시각 관심정보/g, '') // '이 시각 관심정보' 문구 제거
             .trim();
 
-        // 4. 추출한 텍스트를 앱으로 전송
+        // 5. 추출한 텍스트를 앱으로 전송
         res.json({ text: articleText });
 
     } catch (error) {
