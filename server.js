@@ -36,23 +36,22 @@ app.get('/search/news', (req, res) => {
     });
 });
 
-// --- ⭐️ 새로 추가된 웹 스크레이핑 기능 ⭐️ ---
+// --- ⭐️ 업그레이드된 웹 스크레이핑 기능 ⭐️ ---
 app.get('/scrape', async (req, res) => {
-    const { url } = req.query; // 앱에서 분석할 기사의 URL을 받음
+    const { url } = req.query; 
 
     if (!url) {
         return res.status(400).send('URL is required');
     }
 
     try {
-        // 1. axios로 해당 URL의 HTML 페이지를 통째로 가져옴
         const { data } = await axios.get(url);
-
-        // 2. cheerio로 HTML을 분석하기 쉽게 만듦
         const $ = cheerio.load(data);
 
-        // 3. 기사 본문이 들어있는 영역을 선택 (언론사마다 다를 수 있음)
-        //    일반적으로 많이 쓰이는 선택자들을 순서대로 시도합니다.
+        // 1. 불필요한 요소(스크립트, 스타일, 광고 등)를 먼저 제거
+        $('script, style, .ad, .advertisement, #advertisement, .ad-box, .aside_section').remove();
+
+        // 2. 기사 본문이 들어있는 영역을 선택 (언론사마다 다를 수 있음)
         let articleText = 
             $('div#article-body-contents').text() || 
             $('div#dic_area').text() ||
@@ -60,10 +59,16 @@ app.get('/scrape', async (req, res) => {
             $('div.article-veiw-body').text() ||
             $('article').text();
 
-        // 4. 불필요한 공백과 줄바꿈을 정리
-        articleText = articleText.replace(/\s\s+/g, ' ').trim();
+        // 3. 불필요한 공백과 줄바꿈, 광고성 문구를 정규식으로 정리
+        articleText = articleText
+            .replace(/(\s{2,})/g, ' ') // 연속된 공백을 하나로
+            .replace(/(\n\s*){3,}/g, '\n\n') // 3번 이상의 연속 줄바꿈을 두 번으로
+            .replace(/ADVERTISEMENT/g, '') // 'ADVERTISEMENT' 단어 제거
+            .replace(/많이 본 뉴스/g, '') // '많이 본 뉴스' 문구 제거
+            .replace(/이 시각 관심정보/g, '') // '이 시각 관심정보' 문구 제거
+            .trim();
 
-        // 5. 추출한 텍스트를 앱으로 전송
+        // 4. 추출한 텍스트를 앱으로 전송
         res.json({ text: articleText });
 
     } catch (error) {
