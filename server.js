@@ -60,7 +60,20 @@ app.get('/scrape', async (req, res) => {
 
         let articleText = articleBody.text();
 
-        // 4. 불필요한 공백과 줄바꿈, 광고성 문구를 정규식으로 정리
+        // 4. 기사 끝 부분을 나타내는 키워드를 찾아서 그 이후 내용을 잘라냄
+        const endKeywords = ['기자', '특파원', '◎공감언론 뉴시스', '▶'];
+        let endIndex = -1;
+        for (const keyword of endKeywords) {
+            const lastIndex = articleText.lastIndexOf(keyword);
+            if (lastIndex > endIndex) {
+                endIndex = lastIndex + keyword.length;
+            }
+        }
+        if (endIndex !== -1) {
+            articleText = articleText.substring(0, endIndex);
+        }
+
+        // 5. 불필요한 공백과 줄바꿈, 광고성 문구를 정규식으로 정리
         articleText = articleText
             .replace(/(\s{2,})/g, ' ') // 연속된 공백을 하나로
             .replace(/(\n\s*){3,}/g, '\n\n') // 3번 이상의 연속 줄바꿈을 두 번으로
@@ -68,15 +81,11 @@ app.get('/scrape', async (req, res) => {
             .replace(/\[.*?\]/g, '') // [ ] 괄호와 내용 제거 (예: [서울=뉴시스])
             .replace(/【.*?】/g, '') // 【 】 괄호와 내용 제거
             .replace(/\(.*?=.*?\)/g, '') // (서울=연합뉴스) 같은 형식 제거
-            .replace(/기자\s*=/g, '')
             .replace(/Copyrights.*All rights reserved/g, '') // 저작권 문구 제거
             .replace(/무단 전재 및 재배포 금지/g, '') // 재배포 금지 문구 제거
-            .replace(/ADVERTISEMENT/g, '') // 'ADVERTISEMENT' 단어 제거
-            .replace(/많이 본 뉴스/g, '') // '많이 본 뉴스' 문구 제거
-            .replace(/이 시각 관심정보/g, '') // '이 시각 관심정보' 문구 제거
             .trim();
 
-        // 5. 추출한 텍스트를 앱으로 전송
+        // 6. 추출한 텍스트를 앱으로 전송
         res.json({ text: articleText });
 
     } catch (error) {
