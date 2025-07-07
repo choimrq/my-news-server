@@ -45,23 +45,58 @@ app.get('/scrape', async (req, res) => {
     }
 
     try {
-        const { data } = await axios.get(url);
+        const { data } = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
         const $ = cheerio.load(data);
 
         // 1. 불필요한 요소(스크립트, 스타일, 광고, 헤더, 푸터 등)를 먼저 강력하게 제거
-        $('script, style, .ad, .advertisement, #advertisement, .ad-box, #aside_section, .aside_section, header, footer, .header, .footer, #header, #footer, .top-nav, .bottom-nav, .related-news, .news-related, #comment, .comment-area').remove();
+        $('script, style, .ad, .advertisement, #advertisement, .ad-box, #aside_section, .aside_section, header, footer, .header, .footer, #header, #footer, .top-nav, .bottom-nav, .related-news, .news-related, #comment, .comment-area, .OUTBRAIN, .article_relation').remove();
 
-        // 2. 기사 본문이 들어있는 가장 유력한 영역을 선택
-        let articleBody = 
-            $('div#article-body-contents, div#dic_area, div.article_body, div.article-veiw-body, article, section#articleBody');
+        // 2. 기사 본문이 들어있는 가장 유력한 영역을 여러 선택자로 시도
+        let articleBody;
+        const selectors = [
+            'div#article-body-contents', 
+            'div#dic_area',
+            'div.article_body',
+            'div.article-veiw-body',
+            'div.article_view',
+            'div#newsct_article',
+            'div.news_end',
+            'article', 
+            'section#articleBody'
+        ];
+
+        for (const selector of selectors) {
+            if ($(selector).length) {
+                articleBody = $(selector);
+                break;
+            }
+        }
+
+        if (!articleBody) {
+             // 최후의 수단: 본문일 가능성이 높은 가장 큰 div를 찾음
+            let largestDiv = null;
+            let maxSize = 0;
+            $('div').each(function() {
+                const currentSize = $(this).text().length;
+                if (currentSize > maxSize) {
+                    maxSize = currentSize;
+                    largestDiv = $(this);
+                }
+            });
+            articleBody = largestDiv;
+        }
 
         // 3. 본문 영역 내에서도 불필요한 자식 요소를 추가로 제거
-        articleBody.find('.reporter, .byline, .copyright, .article-info, .function_btns').remove();
+        articleBody.find('.reporter, .byline, .copyright, .article-info, .function_btns, .sns-share, .related_news_list').remove();
 
         let articleText = articleBody.text();
 
         // 4. 기사 끝 부분을 나타내는 키워드를 찾아서 그 이후 내용을 잘라냄
-        const endKeywords = ['기자', '특파원', '◎공감언론 뉴시스', '▶'];
+        const endKeywords = ['기자', '특파원', '◎공감언론 뉴시스', '▶', 'Copyrights', '무단 전재 및 재배포 금지'];
         let endIndex = -1;
         for (const keyword of endKeywords) {
             const lastIndex = articleText.lastIndexOf(keyword);
@@ -75,14 +110,12 @@ app.get('/scrape', async (req, res) => {
 
         // 5. 불필요한 공백과 줄바꿈, 광고성 문구를 정규식으로 정리
         articleText = articleText
-            .replace(/(\s{2,})/g, ' ') // 연속된 공백을 하나로
-            .replace(/(\n\s*){3,}/g, '\n\n') // 3번 이상의 연속 줄바꿈을 두 번으로
-            .replace(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/g, '') // 이메일 주소 제거
-            .replace(/\[.*?\]/g, '') // [ ] 괄호와 내용 제거 (예: [서울=뉴시스])
-            .replace(/【.*?】/g, '') // 【 】 괄호와 내용 제거
-            .replace(/\(.*?=.*?\)/g, '') // (서울=연합뉴스) 같은 형식 제거
-            .replace(/Copyrights.*All rights reserved/g, '') // 저작권 문구 제거
-            .replace(/무단 전재 및 재배포 금지/g, '') // 재배포 금지 문구 제거
+            .replace(/(\s{2,})/g, ' ') 
+            .replace(/(\n\s*){3,}/g, '\n\n') 
+            .replace(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/g, '') 
+            .replace(/\[.*?\]/g, '') 
+            .replace(/【.*?】/g, '') 
+            .replace(/\(.*?=.*?\)/g, '')
             .trim();
 
         // 6. 추출한 텍스트를 앱으로 전송
